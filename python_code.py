@@ -1,34 +1,48 @@
-import serial 
-import MySQLdb
+from tkinter import *
+import tkinter.messagebox
+import mysql.connector
+import serial
 import time
 
-#establish connection to MySQL. You'll have to change this for your database.
-dbConn = MySQLdb.connect("localhost","root","","Your DB Name") or die ("could not connect to database")
-#open a cursor to the database
-cursor = dbConn.cursor()
+con = mysql.connector.connect(host='localhost', password='123456789', user='root', database='safety')
+cur = con.cursor()
 
-device = 'COM6' #this will have to be changed to the serial port you are using
-try:
-  print "Trying...",device 
-  arduino = serial.Serial(device, 9600) 
-except: 
-  print "Failed to connect on",device
-while True:
+# This will have to be changed to the serial port you are using
+device = 'COM6'
+print(("Trying..."),device)
+
+arduino = serial.Serial(device, 9600)
+CARD = arduino.readline()
+print(CARD)
+pieces = CARD.split(" ")
+
+# This will check the reader has prior access of information or not
+check = 'select cardno from info where(cardno='+str(CARD)
+cur.execute(check)
+
+if cur.fetchone():
+    print("\033[1;34;47m*Card found in the Database*  \n")
+else:
+    print("\033[1;34;47m*Card not found in the Database*  \n")
     time.sleep(1)
-    try:
-        data=arduino.readline()
-        print data
-        pieces=data.split(" ")
-        try:
-            cursor=dbConn.cursor()
-            cursor.execute("""INSERT INTO <your table name> (ID,Member_ID,allowed_members) VALUES (NULL,%s,%s)""", (pieces[0],pieces[1]))
-            dbConn.commit()
-            cursor.close()
-        except MySQLdb.IntegrityError:
-            print "failed to insert data"
-        finally:
-            cursor.close()
-    except:
-        print "Processing"
-    
-            
+    print('\033[1;34;47m~Card punched at new place~  \n')
+    time.sleep(4)
+    print('\033[2;30;47mCard Details:  \n')
+    time.sleep(2)
+    print(CARD)
+
+    root = Tk()
+    result = tkinter.messagebox.askquestion('Authentication!',
+                                            'Some one wants your information. Do you want to give access?')
+    if result == 'yes':
+        theLabel = Label(root, text="Now he can access your information ")
+        query = 'insert into info values ("{}",{},"{}",{})'.format("name, cardno, email, mobno")
+        cur.execute(query)
+        theLabel.pack()
+    else:
+        theLabel = Label(root, text="You denied the access")
+        theLabel.pack()
+    root.mainloop()
+
+con.commit()
+cur.execute(check)
